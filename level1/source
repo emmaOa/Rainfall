@@ -1,0 +1,17 @@
+// The program uses gets() to read input without bounds checking
+// Buffer overflow allows overwriting return address
+// The run() function at 0x08048444 calls system("/bin/sh")
+// Exploit: Send 76 bytes + address of run() to get shell
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void run() {
+    system("/bin/sh");  
+}
+
+int main() {
+    char buffer[76];
+    gets(buffer);  
+    return 0;
+}
