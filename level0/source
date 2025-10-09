@@ -1,0 +1,15 @@
+// Buffer overflow vulnerability in level1
+// The program uses gets() which doesn't check buffer bounds
+// We overflow to overwrite return address with address of run()
+
+#include <stdio.h>
+
+void run() {
+    system("/bin/sh"); 
+}
+
+int main() {
+    char buffer[64];  
+    gets(buffer);     
+    return 0;
+}
