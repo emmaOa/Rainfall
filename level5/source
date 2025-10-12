@@ -1,0 +1,24 @@
+/* Vulnerability Analysis for level5 */
+// The program has a format string vulnerability in printf(user_input)
+// The n() function calls exit(1) at the end, preventing normal return
+// The o() function at 0x080484a4 calls system() but is never called
+// Exploit: Overwrite GOT entry of exit() to redirect to o()
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void o() {
+    system("/bin/sh");  // Win condition - spawns shell
+}
+
+void n() {
+    char buffer[512];
+    fgets(buffer, 512, stdin);
+    printf(buffer);     // VULNERABLE: Format string bug
+    exit(1);           // Normally exits here
+}
+
+int main() {
+    n();
+    return 0;
+}
