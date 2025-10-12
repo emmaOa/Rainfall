@@ -1,0 +1,33 @@
+/* Vulnerability Analysis for level6 */
+// Heap-based buffer overflow with function pointer overwrite
+// Two heap allocations: 64 bytes (buffer) and 4 bytes (function pointer)
+// strcpy() allows unbounded copy into 64-byte buffer
+// Overflow overwrites function pointer from m() to n()
+// n() calls system() to print the password
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void n() {
+    system("/bin/cat /home/user/level7/.pass");  // Win condition
+}
+
+void m() {
+    puts("Nope");  // Normal function
+}
+
+int main(int argc, char **argv) {
+    char *buffer = malloc(64);           // 64-byte heap buffer
+    void (*func_ptr)() = malloc(4);      // 4-byte function pointer
+    
+    *func_ptr = m;                       // Initially points to m()
+    
+    if(argc > 1) {
+        strcpy(buffer, argv[1]);         // VULNERABLE: Buffer overflow
+    }
+    
+    (*func_ptr)();                       // Calls either m() or n()
+    
+    return 0;
+}
