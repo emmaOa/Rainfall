@@ -1,0 +1,41 @@
+/* Vulnerability Analysis for level7 */
+// Heap overflow with GOT overwrite exploitation
+// Two heap structures with function pointers
+// First strcpy allows overflow to control second struct's pointer
+// Second strcpy writes to controlled location (GOT entry)
+// Overwrite puts@GOT to redirect to m() which prints the password
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char c[68];  // Global buffer at 0x8049960
+
+void m() {
+    printf("%s - %d\n", c, time(0));  // Prints password from global buffer
+}
+
+int main(int argc, char **argv) {
+    // First heap structure
+    void *struct1 = malloc(8);
+    *(int*)struct1 = 1;
+    void *ptr1 = malloc(8);
+    *(void**)((char*)struct1 + 4) = ptr1;
+
+    // Second heap structure  
+    void *struct2 = malloc(8);
+    *(int*)struct2 = 2;
+    void *ptr2 = malloc(8);
+    *(void**)((char*)struct2 + 4) = ptr2;
+
+    // Vulnerable strcpy operations
+    strcpy(ptr1, argv[1]);  // Can overflow into struct2->ptr
+    strcpy(ptr2, argv[2]);  // Writes to controlled location
+
+    // File operations
+    FILE *fp = fopen("/home/user/level8/.pass", "r");
+    fgets(c, 68, fp);  // Read password into global buffer
+
+    puts("~~");  // GOT overwritten to call m() instead
+    return 0;
+}

