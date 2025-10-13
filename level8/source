@@ -1,0 +1,52 @@
+/* Vulnerability Analysis for level8 */
+// Authentication service with heap overflow vulnerability
+// Commands: auth, reset, service, login
+// Service command with long input overflows into auth structure
+// Overflow sets magic value that allows system() call on login
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    int allocated;
+    char name[32];
+    int magic;  // Must be non-zero to call system()
+} auth_t;
+
+auth_t *auth = NULL;
+char *service = NULL;
+
+int main() {
+    char buffer[128];
+    
+    while(1) {
+        printf("(%p, %p)\n", auth, service);
+        
+        if(fgets(buffer, 128, stdin) == NULL) break;
+        
+        if(strncmp(buffer, "auth ", 5) == 0) {
+            // Allocate auth structure
+            auth = malloc(sizeof(auth_t));
+            auth->allocated = 1;
+            auth->magic = 0;
+            strcpy(auth->name, buffer + 5);  // Limited to 30 bytes
+        }
+        else if(strncmp(buffer, "reset", 5) == 0) {
+            // Free auth structure
+            free(auth);
+        }
+        else if(strncmp(buffer, "service", 6) == 0) {
+            // Allocate service string - NO BOUNDS CHECK
+            service = strdup(buffer + 7);  // Can be any length
+        }
+        else if(strncmp(buffer, "login", 5) == 0) {
+            if(auth && auth->magic != 0) {
+                system("/bin/sh");  // Win condition
+            } else {
+                fwrite("Password:\n", 1, 10, stdout);
+            }
+        }
+    }
+    return 0;
+}
