@@ -1,15 +1,26 @@
-// Buffer overflow vulnerability in level1
-// The program uses gets() which doesn't check buffer bounds
-// We overflow to overwrite return address with address of run()
-
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <Kernel/sys/_types/_gid_t.h>
 
-void run() {
-    system("/bin/sh"); 
-}
-
-int main() {
-    char buffer[64];  
-    gets(buffer);     
+int main(int argc, char **argv)
+{
+    int input;
+    char *shell[2];
+    
+    input = atoi(argv[1]);
+    
+    if (input == 423) {
+        shell[0] = strdup("/bin/sh");
+        shell[1] = NULL;
+        gid_t gid = getegid();
+        uid_t uid = geteuid();
+        setresgid(gid, gid, gid);
+        setresuid(uid, uid, uid);
+        execv("/bin/sh", shell);
+    } else {
+        fwrite("No !\n", 1, 5, stderr);
+    }
+    
     return 0;
 }
