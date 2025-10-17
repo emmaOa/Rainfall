@@ -1,25 +1,22 @@
-/* Vulnerability Analysis for level3 */
-// The program has a format string vulnerability in printf(user_input)
-// It checks a global variable at 0x804988c and compares it with 0x40 (64)
-// If the value is 64, it calls system("/bin/sh")
-// Exploit: Use format string to overwrite the global variable with 64
-
 #include <stdio.h>
+#include <stdlib.h>
 
-int global_var = 0;  // At address 0x804988c
-
-void v() {
-    char buffer[512];
+int m = 0;
+void p(char *str)
+{
+    printf(str);  // Vulnerable format string!
     
-    fgets(buffer, 512, stdin);  // Safe input
-    printf(buffer);             // VULNERABLE: Format string bug
-    
-    if(global_var == 64) {      // 0x40 in hexadecimal
-        system("/bin/sh");      // Win condition
+    if (m == 64) {
+        fwrite("Wait what?!\n", 1, 12, stdout);
+        system("/bin/sh");
     }
 }
 
-int main() {
-    v();
+int main(void)
+{
+    char buffer[520];
+    
+    fgets(buffer, 512, stdin);
+    p(buffer);
     return 0;
 }
