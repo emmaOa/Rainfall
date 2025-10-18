@@ -1,0 +1,16 @@
+# Vulnerability
+Integer overflow in `memcpy()` length parameter.
+
+# Key Points
+```c
+int len = atoi(argv[1]);
+if (len < 10) {
+    memcpy(buffer, argv[2], len * 4);
+}
+```
+
+# Exploit
+Use negative number to pass check but overflow in multiplication:
+- Input: -2147483647
+- len * 4 wraps to large positive number
+- Overflows buffer and overwrites return address

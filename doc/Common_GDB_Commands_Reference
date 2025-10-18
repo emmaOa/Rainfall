@@ -1,0 +1,65 @@
+# Start debugging
+gdb ./level0
+gdb --args ./level0 arg1 arg2
+
+# Set display format
+set disassembly-flavor intel
+set pagination off
+
+# Breakpoints
+break main
+break *0x08048484
+break function_name
+delete 1
+
+# Running
+run
+run $(python -c 'print "A"*100')
+run < input.txt
+continue
+quit
+
+# Examining code
+disas main
+disas function_name
+x/20i $eip
+
+# Examining memory
+x/20wx $esp           # 20 words in hex from ESP
+x/s 0x08048530        # String at address
+x/20xb $esp           # 20 bytes in hex
+x/10i main            # 10 instructions at main
+
+# Registers
+info registers
+print $eax
+set $eax = 0x41414141
+
+# Pattern creation (with PEDA/pwndbg)
+pattern create 200
+pattern offset 0x41414141
+pattern offset $eip
+
+# Finding strings and functions
+info functions
+info variables
+print system
+find &system,+9999999,"/bin/sh"
+find /b 0x08048000,0x08049000,0xff,0xe4
+
+# Stack examination
+backtrace
+info frame
+x/40wx $ebp-100
+
+# Stepping
+ni    # Next instruction
+si    # Step into
+finish # Run until return
+
+# Shell commands
+!ls
+!cat /tmp/file
+
+# Save commands
+python open('/tmp/payload','w').write('A'*76 + '\x44\x84\x04\x08')

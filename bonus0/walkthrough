@@ -1,0 +1,10 @@
+# Vulnerability
+Multiple `strcpy()` calls without bounds checking.
+
+# Key Points
+- Read input twice with `read()`
+- Copies to local buffers with `strcpy()`
+- Concatenates strings causing overflow
+
+# Exploit
+Buffer overflow to overwrite return address with shellcode in environment.

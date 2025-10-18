@@ -1,0 +1,10 @@
+# Vulnerability
+Environment variable handling with `strncpy()`.
+
+# Key Points
+- Reads LANG environment variable
+- Uses `strncpy()` but calculations allow overflow
+- Combines multiple buffers unsafely
+
+# Exploit
+Set LANG variable to overflow when combined with user input.

@@ -1,0 +1,10 @@
+# Vulnerability
+Incorrect use of `atoi()` return value.
+
+# Key Points
+- Empty string to `atoi()` returns 0
+- File operation uses this as buffer index
+- Can read arbitrary files
+
+# Exploit
+Pass empty string to access file at index 0, which contains the password.
